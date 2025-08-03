@@ -1,12 +1,13 @@
-name: Wake Neo4j and Start RAG App
+name: Wake Neo4j + Start and Stop Kamatera VPS
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Runs every day at 06:00 UTC (08:00 Germany)
-  workflow_dispatch:     # Allow manual trigger
+    - cron: '0 6 * * *'   # 🕗 08:00 CET — Start Neo4j + VPS
+    - cron: '0 18 * * *'  # 🕗 20:00 CET — Stop VPS
+  workflow_dispatch:     # Manual trigger option
 
 jobs:
-  wake_and_start:
+  manage_rag_app:
     runs-on: ubuntu-latest
     env:
       NEO4J_URI: ${{ secrets.NEO4J_URI }}
@@ -16,38 +17,57 @@ jobs:
       KAMATERA_SERVER_ID: ${{ secrets.KAMATERA_SERVER_ID }}
 
     steps:
-      - name: Checkout (optional, good practice)
+      - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Wake up Neo4j AuraDB
+      - name: Determine Task Based on Time
+        id: task
+        run: |
+          hour=$(date -u +"%H")
+          echo "🕒 Current UTC Hour: $hour"
+          if [ "$hour" -eq 6 ]; then
+            echo "task=start" >> $GITHUB_OUTPUT
+          elif [ "$hour" -eq 18 ]; then
+            echo "task=stop" >> $GITHUB_OUTPUT
+          else
+            echo "task=skip" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wake up Neo4j AuraDB (Only on Start)
+        if: steps.task.outputs.task == 'start'
         run: |
           pip install neo4j
           python3 <<EOF
           from neo4j import GraphDatabase
-          import time
-
           uri = "${{ env.NEO4J_URI }}"
           user = "${{ env.NEO4J_USER }}"
           password = "${{ env.NEO4J_PASSWORD }}"
 
-          print("🌐 Connecting to Neo4j...")
+          print("🌐 Connecting to Neo4j AuraDB...")
           driver = GraphDatabase.driver(uri, auth=(user, password))
-
-          def wake_db(tx):
-              result = tx.run("MATCH (n) RETURN count(n)")
-              print("✅ Neo4j responded with:", result.single())
-
           with driver.session() as session:
-              session.execute_read(wake_db)
+              result = session.run("MATCH (n) RETURN count(n)")
+              print("✅ Neo4j responded with:", result.single())
           driver.close()
-          print("🧠 AuraDB should now be awake.")
+          print("🧠 AuraDB is now awake.")
           EOF
 
       - name: Wait 30 seconds before starting VPS
+        if: steps.task.outputs.task == 'start'
         run: sleep 30
 
       - name: Start Kamatera VPS
+        if: steps.task.outputs.task == 'start'
         run: |
+          echo "🚀 Starting VPS..."
           curl -X POST https://console.kamatera.com/service/server/start \
+            -H "X-API-Token: ${{ env.KAMATERA_API_KEY }}" \
+            -d "serverId=${{ env.KAMATERA_SERVER_ID }}"
+
+      - name: Stop Kamatera VPS
+        if: steps.task.outputs.task == 'stop'
+        run: |
+          echo "⏹️ Stopping VPS..."
+          curl -X POST https://console.kamatera.com/service/server/stop \
             -H "X-API-Token: ${{ env.KAMATERA_API_KEY }}" \
             -d "serverId=${{ env.KAMATERA_SERVER_ID }}"
