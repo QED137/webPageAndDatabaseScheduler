@@ -58,7 +58,7 @@ This repository automates the **daily start and stop schedule** for my [CineBot 
 
 ## 📅 Customize Schedule
 
-Update the CRON times in `.github/workflows/kamatera-scheduler.yml` if you want a different schedule.
+Update the CRON times in `.github/workflows/wakup-rag.yml` if you want a different schedule.
 
 ```yaml
 # Default: Start at 6:00 UTC (8 AM Germany), Stop at 18:00 UTC (8 PM Germany)
