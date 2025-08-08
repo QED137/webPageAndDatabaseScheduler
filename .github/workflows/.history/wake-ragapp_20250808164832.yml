@@ -39,11 +39,12 @@ jobs:
           pip install neo4j
           python3 <<EOF
           from neo4j import GraphDatabase
-          import os
-          import base64
+          
           uri = base64.b64decode(os.environ["NEO4J_URI"]).decode()
           user = "${{ env.NEO4J_USER }}"
           password = "${{ env.NEO4J_PASSWORD }}"
+          import os
+          import base64
           print("🌐 Connecting to Neo4j AuraDB...")
           driver = GraphDatabase.driver(uri, auth=(user, password))
           with driver.session() as session:
